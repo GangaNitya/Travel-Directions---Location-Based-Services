@@ -1,0 +1,279 @@
+<!doctype html>
+<html lang="en">
+   <head>
+        <title>jQuery mobile with Google maps</title>
+        <style>
+.scrollable {
+            overflow-y: scroll;
+            -webkit-overflow-scrolling: touch;
+        }
+      /*
+       #drive{     
+        background:url("drive.png");
+        background-attachment:fixed;
+        background-position:center;
+        color: #000;
+        font-family: Arial, Verdana, sans-serif;
+        margin: 0;
+        padding: 0;
+        width: 100px;
+        height: 100px;
+      }
+*/
+        </style>
+        <link rel="stylesheet" href="http://code.jquery.com/mobile/1.2.0/jquery.mobile-1.2.0.min.css" />
+
+        <script src="http://code.jquery.com/jquery-1.8.2.min.js"></script>
+        <script src="http://code.jquery.com/mobile/1.2.0/jquery.mobile-1.2.0.min.js"></script>
+        
+        <script src="https://maps.googleapis.com/maps/api/js?v=3.exp&signed_in=true"></script>
+        <script type="text/javascript">
+        function loadicon(){
+
+          var i = document.getElementById("transportmode").value;
+          var dv = document.getElementById('imgDiv');
+
+// remove all child nodes
+while (dv.hasChildNodes()) { 
+    dv.removeChild(dv.lastChild); 
+} 
+
+var img = document.createElement("IMG");
+if(i=="WALKING") 
+img.src = "walk.png";
+else if(i=="TRANSIT") 
+  img.src = "bus.png";
+else if(i=="BICYCLING") 
+  img.src = "cycle.png";
+else if(i=="DRIVING") 
+  img.src = "drive.png";
+
+
+dv.appendChild(img); 
+        }
+
+           
+    //it starts hereeeeee
+
+    var directionsDisplay;
+var directionsService = new google.maps.DirectionsService();
+
+function initialize() {
+  directionsDisplay = new google.maps.DirectionsRenderer();
+  var mapOptions = {
+    zoom: 7,
+   // center: new google.maps.LatLng(41.850033, -87.6500523)
+  };
+  var map = new google.maps.Map(document.getElementById('map_canvas'),
+      mapOptions);
+
+
+//copy pasting
+
+
+ if(navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(function(position) {
+      var pos = new google.maps.LatLng(position.coords.latitude,
+                                       position.coords.longitude);
+//here
+var address;
+      var geocoder = new google.maps.Geocoder();
+      geocoder.geocode({'latLng': pos}, function(results, status) {
+    if (status == google.maps.GeocoderStatus.OK) {
+      if (results[1]) {
+        map.setZoom(11);
+        marker = new google.maps.Marker({
+            position: pos,
+            map: map
+        });
+        //alert(results[1].formatted_address);
+var infowindow = new google.maps.InfoWindow();
+infowindow.open(map, marker);
+infowindow.setContent(results[1].formatted_address)
+$('#source').val(results[1].formatted_address);
+
+      }
+    }
+  });
+
+      /*var infowindow = new google.maps.InfoWindow({
+        map: map,
+        position: pos,
+        content: "setting"//to here
+      });*/
+    //  infowindow.setContent(results[1].formatted_address)
+
+      map.setCenter(pos);
+    }, function() {
+      handleNoGeolocation(true);
+    });
+
+
+
+  }else {
+    // Browser doesn't support Geolocation
+    handleNoGeolocation(false);
+  }
+
+
+function handleNoGeolocation(errorFlag) {
+  if (errorFlag) {
+    var content = 'Error: The Geolocation service failed.';
+  } else {
+    var content = 'Error: Your browser doesn\'t support geolocation.';
+  }
+
+  var options = {
+    map: map,
+    position: new google.maps.LatLng(60, 105),
+    content: content
+  };
+
+  var infowindow = new google.maps.InfoWindow(options);
+  map.setCenter(options.position);
+}
+
+
+//copy pasting
+
+  directionsDisplay.setMap(map);
+  directionsDisplay.setPanel(document.getElementById('directions-panel'));
+
+  /*var control = document.getElementById('control');
+  control.style.display = 'block';
+  map.controls[google.maps.ControlPosition.TOP_CENTER].push(control);*/
+}
+
+function calcRoute() {
+window.speechSynthesis.cancel();
+  loadicon();
+  var start = document.getElementById("source").value;
+  var end = document.getElementById("destination").value;
+   var selectedMode = document.getElementById("transportmode").value;
+
+  var request = {
+    origin: start,
+    destination: end,
+    travelMode: google.maps.TravelMode[selectedMode]
+  };
+  directionsService.route(request, function(response, status) {
+    if (status == google.maps.DirectionsStatus.OK) {
+      directionsDisplay.setDirections(response);
+
+var myRoute = response.routes[0];
+
+//myRoute.legs[0].start_address
+for(var i = 0;i<myRoute.legs[0].steps.length;i++){
+var tagstripped_msg = myRoute.legs[0].steps[i].instructions.replace(/<\/?[^>]+(>|$)/g, "");
+    var msg = new SpeechSynthesisUtterance(tagstripped_msg);
+window.speechSynthesis.speak(msg);
+}
+
+    }
+  });
+}
+
+            google.maps.event.addDomListener(window, 'load', initialize);
+
+            //speech recognition related
+
+            // Test browser support
+   window.SpeechRecognition = window.SpeechRecognition       ||
+                                 window.webkitSpeechRecognition ||
+                                null;
+     
+        var recognizer = new window.SpeechRecognition();
+        
+      recognizer.continuous = true;
+    recognizer.onresult = function(event) {
+          $('#destination').val('');
+ 
+          for (var i = event.resultIndex; i < event.results.length; i++) {
+            if (event.results[i].isFinal) {
+              $('#destination').val(event.results[i][0].transcript);// + ' (Confidence: ' + event.results[i][0].confidence + ')';
+            } else {
+              $('#destination').val($('#destination').val()+event.results[i][0].transcript);
+            }
+          }
+        };
+
+      function speak(){
+
+  $('#spbutton').click(function() {
+  //alert($('#destination').val());
+  recognizer.start();
+});
+}
+  function stop_speak(){
+
+  $('#spbutton').click(function() {
+  
+  recognizer.stop();
+});
+
+}
+  function clear_dest(){
+
+  $('#clbutton').click(function() {
+    
+  $('#destination').val('');
+});
+
+}
+function stop_read(){
+  $('#stopreadbutton').click(function() {
+    window.speechSynthesis.cancel();
+  
+});
+}
+
+        </script>
+    </head>
+    <body>
+        <div id="basic-map" data-role="page">
+            <div data-role="header">
+                <h1>Maps Pitt</h1>
+
+            </div>
+            <div data-role="content">   
+<div id="control">
+          <label for="source">Source</label>
+          <input type="text" name="source" id="source" placeholder="Source..." onchange="calcRoute()" value="ellsworth avenue pittsburgh">
+          <label for="destination">Destination</label>
+          <input type="text" name="destination" id="destination" placeholder="Destination..."  >
+     <!-- <input type="button" id="spbuton" value="Speak Destination" onclick="speak()" /> -->
+     <a id="spbutton" data-role="button" data-inline="true" data-theme="b" onclick="speak()" >Speak Destination</a>
+     <a id="stbutton" data-role="button" data-inline="true" data-theme="b" onclick="stop_speak()" >Stop Speaking</a>
+     <a id="clbutton" data-role="button" data-inline="true" data-theme="b" onclick="clear_dest()">Clear </a>
+     <a id="stopreadbutton" data-role="button" data-inline="true" data-theme="b" onclick="stop_read()">Stop Reading Directions</a>
+        <label for="transportmode" class="select">Mode of Transport</label>
+<select name="transportmode" id="transportmode" onchange="calcRoute()">
+   <option value="DRIVING">Driving</option>
+   <option value="WALKING">Walking</option>
+   <option value="BICYCLING">Bicycling</option>
+   <option value="TRANSIT">Transit</option>
+</select>
+<div id = "directions-panel">
+</div>
+           
+
+ 
+
+
+        
+                <div class="ui-bar-c ui-corner-all ui-shadow" style="padding:1em;">
+                  <div id="map_canvas" style="height:350px;"></div>
+                </div>
+                <div id="directions" class="scrollable"></div>
+                <div id="results" style="display:none;">
+                    
+
+                </div>
+            </div>
+        </div>
+        <div id="imgDiv"></div>
+            
+        </div>    
+           
+    </body>
+</html>
